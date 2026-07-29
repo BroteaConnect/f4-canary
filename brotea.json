@@ -14,6 +14,12 @@
       "services": [
         "glitchtip"
       ]
+    },
+    "db": {
+      "version": "1.0.0",
+      "services": [
+        "pocketbase"
+      ]
     }
   },
   "theme": {

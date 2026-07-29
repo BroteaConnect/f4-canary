@@ -11,6 +11,8 @@ COPY . .
 # wires one ARG/ENV pair per feature right below this anchor; the deploy
 # skill supplies the values as Coolify build args.
 # brotea:build-args
+ARG PUBLIC_PB_URL
+ENV PUBLIC_PB_URL=$PUBLIC_PB_URL
 ARG PUBLIC_GLITCHTIP_DSN
 ENV PUBLIC_GLITCHTIP_DSN=$PUBLIC_GLITCHTIP_DSN
 ARG PUBLIC_UMAMI_WEBSITE_ID
