@@ -1,0 +1,15 @@
+---
+// One file, every language: getStaticPaths generates / and /<code>/ for each
+// locale in src/locales/config.json. Adding a language adds pages by itself.
+import Layout from '../../layouts/Layout.astro';
+import { localePaths, t } from '../../lib/i18n';
+
+export const getStaticPaths = localePaths;
+const { locale } = Astro.props;
+---
+
+<Layout title="__PROJECT_NAME__" locale={locale}>
+  <h1>__PROJECT_NAME__</h1>
+  <p>{t(locale, 'home.tagline')}</p>
+  <p>{t(locale, 'home.generated', { stack: 'astro' })}</p>
+</Layout>

@@ -1,0 +1,6 @@
+{
+  "home.generated": "Generado con el stack {stack} de Brotea. Las features que añade la fábrica de plantillas aparecen en el menú de arriba, renderizadas como islas de React.",
+  "home.tagline": "__PROJECT_DESCRIPTION__",
+  "nav.home": "Inicio",
+  "nav.language": "Idioma"
+}
