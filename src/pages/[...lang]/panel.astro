@@ -1,0 +1,161 @@
+---
+// The demo the whole SSO chain exists for: this page shows nothing until a
+// Brotea identity has been exchanged for a PocketBase session, and then reads
+// and writes a collection whose rules only admit `admin`.
+//
+// The point is the second half. A gate that only hides UI is theatre — what
+// proves the design is that the *API* refuses. `demo_notas` is protected by
+// PocketBase rules (@request.auth.role = "admin"), so the browser could not
+// read it even with the gate removed.
+import Layout from '../../layouts/Layout.astro';
+import AuthGate from '../../components/AuthGate.astro';
+import { localePaths, t } from '../../lib/i18n';
+
+export const getStaticPaths = localePaths;
+const { locale } = Astro.props;
+---
+
+<Layout title={t(locale, 'panel.title')} locale={locale}>
+  <AuthGate locale={locale} />
+
+  <section
+    id="panel"
+    data-msg-empty={t(locale, 'panel.empty')}
+    data-msg-error={t(locale, 'panel.error')}
+    data-msg-denied={t(locale, 'panel.denied')}
+  >
+    <h1>{t(locale, 'panel.title')}</h1>
+    <p class="who">
+      <span id="panel-who"></span>
+      <button type="button" id="panel-signout" data-auth-lock>{t(locale, 'auth.signout')}</button>
+    </p>
+
+    <h2>{t(locale, 'panel.notes')}</h2>
+    <p class="hint">{t(locale, 'panel.notes.hint')}</p>
+    <ul id="panel-list"></ul>
+
+    <form id="panel-form">
+      <label>
+        {t(locale, 'panel.new')}
+        <input type="text" name="texto" required maxlength="120" />
+      </label>
+      <button type="submit">{t(locale, 'panel.add')}</button>
+      <p class="msg" id="panel-msg" role="alert"></p>
+    </form>
+  </section>
+</Layout>
+
+<script>
+  import { list, create } from '../../lib/pb';
+  import { currentUser, signOut, withFreshSession } from '../../lib/auth';
+
+  const panel = document.getElementById('panel') as HTMLElement;
+  const who = document.getElementById('panel-who') as HTMLElement;
+  const ul = document.getElementById('panel-list') as HTMLElement;
+  const form = document.getElementById('panel-form') as HTMLFormElement;
+  const msg = document.getElementById('panel-msg') as HTMLElement;
+
+  interface Nota { id: string; texto: string; created: string }
+
+  /** PocketBase answers 400 (not 403) when a create rule refuses. Both mean the
+   *  same thing to a person: your role does not reach this data. */
+  const denied = (err: unknown) => /\b(400|403)\b/.test(String(err));
+
+  async function render() {
+    const user = currentUser();
+    who.textContent = user ? `${user.email} · ${user.role}` : '';
+    // The form is for admins. Hiding it is courtesy, not protection: the rules
+    // refuse a `member` even with the form put back by hand.
+    form.hidden = user?.role !== 'admin';
+    ul.replaceChildren();
+    try {
+      // withFreshSession: PocketBase sessions last an hour on purpose, so a 401
+      // in a long visit is ordinary — refresh upstream and retry, do not throw
+      // a stack trace at somebody who did nothing wrong.
+      const res = await withFreshSession(() => list<Nota>('demo_notas', { sort: '-created', perPage: '20' }));
+      if (!res || !res.items.length) {
+        const li = document.createElement('li');
+        li.textContent = panel.dataset.msgEmpty ?? '';
+        ul.append(li);
+        return;
+      }
+      for (const n of res.items) {
+        const li = document.createElement('li');
+        li.textContent = n.texto;
+        ul.append(li);
+      }
+    } catch (err) {
+      // A `member` lands here: the rules refuse, and that IS the demo.
+      msg.textContent = denied(err) ? panel.dataset.msgDenied ?? '' : panel.dataset.msgError ?? '';
+    }
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    msg.textContent = '';
+    const texto = String(new FormData(form).get('texto') ?? '').trim();
+    if (!texto) return;
+    try {
+      await withFreshSession(() => create('demo_notas', { texto }));
+      form.reset();
+      await render();
+    } catch (err) {
+      msg.textContent = denied(err) ? panel.dataset.msgDenied ?? '' : panel.dataset.msgError ?? '';
+    }
+  });
+
+  document.getElementById('panel-signout')!.addEventListener('click', () => {
+    signOut();
+    location.reload();
+  });
+
+  // Same handshake as every other async unlock in the factory.
+  if (document.documentElement.hasAttribute('data-brotea-auth')) render();
+  else document.addEventListener('brotea:signedin', () => render(), { once: true });
+</script>
+
+<style>
+  .who { display: flex; align-items: center; gap: var(--space-3); color: var(--muted); }
+  #panel-who { font-weight: 600; color: var(--text); }
+  #panel-signout {
+    padding: .3rem .8rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: .85rem;
+    cursor: pointer;
+  }
+  #panel-signout:hover { border-color: var(--primary); color: var(--primary); }
+  .hint { color: var(--muted); font-size: .9rem; }
+  ul { padding-inline-start: var(--space-5); }
+  li { margin-bottom: .35rem; }
+  form { margin-top: var(--space-5); }
+  /* `hidden` only wins while no author rule sets display — say it out loud */
+  form[hidden] { display: none; }
+  label { display: block; font-weight: 600; margin-bottom: var(--space-3); }
+  input {
+    display: block;
+    width: 100%;
+    max-width: 420px;
+    margin-top: .35rem;
+    padding: .5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg);
+    color: var(--text);
+    font: inherit;
+  }
+  form button {
+    padding: .55rem 1.3rem;
+    border: 1px solid var(--primary);
+    border-radius: var(--radius);
+    background: var(--primary);
+    color: var(--primary-contrast);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .msg { min-height: 1.2em; color: var(--danger); font-size: .9rem; }
+</style>
