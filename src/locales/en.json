@@ -1,4 +1,6 @@
 {
+  "auth.breakglass": "Emergency access",
+  "auth.breakglass.hint": "Only use this if the team gave you an emergency password for this application.",
   "auth.callback.working": "Signing you in…",
   "auth.denied": "Your Brotea account has no access to this application. Ask the team for it.",
   "auth.email": "E-mail",

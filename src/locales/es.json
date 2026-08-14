@@ -1,4 +1,6 @@
 {
+  "auth.breakglass": "Acceso de emergencia",
+  "auth.breakglass.hint": "Úsalo solo si el equipo te ha dado una contraseña de emergencia para esta aplicación.",
   "auth.callback.working": "Entrando…",
   "auth.denied": "Tu cuenta de Brotea no tiene acceso a esta aplicación. Pídeselo al equipo.",
   "auth.email": "Correo",
