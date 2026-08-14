@@ -1,0 +1,240 @@
+---
+// The screen that replaces a shell command. Behind the gate, and behind a
+// superadmin session — but the gate is courtesy: every route it calls checks
+// the role again in PocketBase, because a hidden button is not a permission.
+import Layout from '../../../layouts/Layout.astro';
+import AuthGate from '../../../components/AuthGate.astro';
+import { localePaths, t } from '../../../lib/i18n';
+
+export const getStaticPaths = localePaths;
+const { locale } = Astro.props;
+---
+
+<Layout title={t(locale, 'admin.users.title')} locale={locale}>
+  <AuthGate locale={locale} />
+
+  <section
+    id="admin-users"
+    data-msg-error={t(locale, 'admin.users.error')}
+    data-msg-empty={t(locale, 'admin.users.empty')}
+    data-msg-never={t(locale, 'admin.users.never')}
+    data-msg-revoke={t(locale, 'admin.users.revoke.confirm')}
+    data-msg-revoke-all={t(locale, 'admin.users.revoke.all.confirm')}
+    data-msg-sweep={t(locale, 'admin.users.sweep')}
+    data-msg-invited={t(locale, 'admin.users.invite.done')}
+    data-label-revoke={t(locale, 'admin.users.revoke')}
+    data-label-revoke-all={t(locale, 'admin.users.revoke.all')}
+  >
+    <h1>{t(locale, 'admin.users.title')}</h1>
+    <p class="msg" id="admin-msg" role="alert"></p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>{t(locale, 'admin.users.email')}</th>
+          <th>{t(locale, 'admin.users.roles')}</th>
+          <th>{t(locale, 'admin.users.last')}</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="admin-rows"></tbody>
+    </table>
+
+    <h2>{t(locale, 'admin.users.grant')}</h2>
+    <form id="admin-grant">
+      <label>
+        {t(locale, 'admin.users.email')}
+        <input type="email" name="email" required autocomplete="off" list="admin-known" />
+      </label>
+      <datalist id="admin-known"></datalist>
+      <label>
+        {t(locale, 'admin.users.app')}
+        <input type="text" name="app" required autocomplete="off" list="admin-apps" />
+      </label>
+      <datalist id="admin-apps"></datalist>
+      <label>
+        {t(locale, 'admin.users.role')}
+        <select name="role">
+          <option value="member">{t(locale, 'admin.users.role.member')}</option>
+          <option value="admin">{t(locale, 'admin.users.role.admin')}</option>
+        </select>
+      </label>
+      <button type="submit">{t(locale, 'admin.users.grant')}</button>
+    </form>
+
+    <h2>{t(locale, 'admin.users.invite.title')}</h2>
+    <form id="admin-invite">
+      <label>
+        {t(locale, 'admin.users.email')}
+        <input type="email" name="email" required autocomplete="off" />
+      </label>
+      <button type="submit">{t(locale, 'admin.users.invite')}</button>
+    </form>
+  </section>
+</Layout>
+
+<script>
+  import { currentUser } from '../../../lib/auth';
+  import { grant, invite, listIdentities, knownApps, revoke, rolesOf, type Identity } from '../../../lib/admin';
+
+  const root = document.getElementById('admin-users') as HTMLElement;
+  const rows = document.getElementById('admin-rows') as HTMLElement;
+  const msg = document.getElementById('admin-msg') as HTMLElement;
+  const grantForm = document.getElementById('admin-grant') as HTMLFormElement;
+  const inviteForm = document.getElementById('admin-invite') as HTMLFormElement;
+  const knownEmails = document.getElementById('admin-known') as HTMLDataListElement;
+  const knownAppList = document.getElementById('admin-apps') as HTMLDataListElement;
+
+  const fill = (list: HTMLDataListElement, values: string[]) => {
+    list.replaceChildren();
+    for (const v of values) {
+      const o = document.createElement('option');
+      o.value = v;
+      list.append(o);
+    }
+  };
+
+  function cell(text: string) {
+    const td = document.createElement('td');
+    td.textContent = text;
+    return td;
+  }
+
+  async function render() {
+    msg.textContent = '';
+    let identities: Identity[] = [];
+    try {
+      identities = await listIdentities();
+    } catch (err) {
+      msg.textContent = root.dataset.msgError ?? '';
+      return;
+    }
+    fill(knownEmails, identities.map((i) => i.email));
+    fill(knownAppList, knownApps(identities));
+
+    rows.replaceChildren();
+    if (!identities.length) {
+      const tr = document.createElement('tr');
+      tr.append(cell(root.dataset.msgEmpty ?? ''));
+      rows.append(tr);
+      return;
+    }
+
+    for (const person of identities) {
+      const tr = document.createElement('tr');
+      tr.append(cell(person.email + (person.disabled ? ' ⛔' : '')));
+      tr.append(cell(rolesOf(person).join(' · ') || '—'));
+      tr.append(cell(person.last_sign_in ? new Date(person.last_sign_in).toLocaleDateString() : root.dataset.msgNever ?? ''));
+
+      const actions = document.createElement('td');
+      for (const [app, role] of Object.entries(person.brotea?.apps ?? {})) {
+        if (!role) continue; // already excluded there
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.textContent = `${root.dataset.labelRevoke} · ${app}`;
+        b.addEventListener('click', async () => {
+          const q = (root.dataset.msgRevoke ?? '').replace('{email}', person.email).replace('{app}', app);
+          if (!confirm(q)) return;
+          await act(() => revoke(person.email, app));
+        });
+        actions.append(b);
+      }
+      const all = document.createElement('button');
+      all.type = 'button';
+      all.className = 'danger';
+      all.textContent = root.dataset.labelRevokeAll ?? '';
+      all.addEventListener('click', async () => {
+        const q = (root.dataset.msgRevokeAll ?? '').replace('{email}', person.email);
+        if (!confirm(q)) return;
+        const res = await act(() => revoke(person.email));
+        // Saying "done" here would be a lie: the other apps still hold a
+        // projection of the old role until their next sign-in.
+        if (res?.sweep_required) msg.textContent = root.dataset.msgSweep ?? '';
+      });
+      actions.append(all);
+      tr.append(actions);
+      rows.append(tr);
+    }
+  }
+
+  async function act<T>(fn: () => Promise<T>): Promise<T | null> {
+    try {
+      const out = await fn();
+      await render();
+      return out;
+    } catch (err) {
+      msg.textContent = root.dataset.msgError ?? '';
+      return null;
+    }
+  }
+
+  grantForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const d = new FormData(grantForm);
+    await act(() => grant(String(d.get('email')), String(d.get('app')), String(d.get('role')) as 'admin' | 'member'));
+    grantForm.reset();
+  });
+
+  inviteForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const d = new FormData(inviteForm);
+    const res = await act(() => invite(String(d.get('email'))));
+    if (res) msg.textContent = root.dataset.msgInvited ?? '';
+    inviteForm.reset();
+  });
+
+  function start() {
+    // The nav link ships hidden and is revealed here, so a member never sees a
+    // door they cannot open. The door itself is locked server-side regardless.
+    if (currentUser()?.role === 'superadmin') {
+      for (const el of document.querySelectorAll('[data-brotea-role="superadmin"]')) el.removeAttribute('hidden');
+      render();
+    } else {
+      msg.textContent = root.dataset.msgError ?? '';
+    }
+  }
+
+  if (document.documentElement.hasAttribute('data-brotea-auth')) start();
+  else document.addEventListener('brotea:signedin', () => start(), { once: true });
+</script>
+
+<style>
+  table { width: 100%; border-collapse: collapse; margin-bottom: var(--space-6); }
+  th, td { text-align: start; padding: var(--space-3); border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { font-family: var(--font-display); font-size: .9rem; color: var(--muted); }
+  td button {
+    margin: 0 var(--space-2) var(--space-2) 0;
+    padding: .3rem .7rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: .8rem;
+    cursor: pointer;
+  }
+  td button:hover { border-color: var(--primary); color: var(--primary); }
+  td button.danger:hover { border-color: var(--danger); color: var(--danger); }
+  h2 { font-family: var(--font-display); font-size: 1.1rem; margin: var(--space-6) 0 var(--space-3); }
+  form { display: flex; flex-wrap: wrap; gap: var(--space-4); align-items: end; }
+  label { display: flex; flex-direction: column; gap: 4px; font-weight: 600; font-size: .9rem; }
+  input, select {
+    padding: .5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg);
+    color: var(--text);
+    font: inherit;
+  }
+  form button {
+    padding: .55rem 1.2rem;
+    border: 1px solid var(--primary);
+    border-radius: var(--radius);
+    background: var(--primary);
+    color: var(--primary-contrast);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .msg { min-height: 1.2em; color: var(--danger); font-size: .9rem; }
+</style>
