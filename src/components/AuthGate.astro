@@ -49,11 +49,28 @@ const { locale } = Astro.props;
       <button type="button" class="auth-link" id="brotea-auth-magic">{t(locale, 'auth.magic.submit')}</button>
       <p class="auth-msg" id="brotea-auth-msg" role="alert"></p>
     </form>
+
+    <!-- Server-rendered but closed: revealed only when the identity plane does
+         not answer, so it never invites a second door on a normal day. -->
+    <form id="brotea-auth-breakglass" hidden>
+      <h3>{t(locale, 'auth.breakglass')}</h3>
+      <p class="auth-hint">{t(locale, 'auth.breakglass.hint')}</p>
+      <label>
+        {t(locale, 'auth.email')}
+        <input type="email" name="email" required autocomplete="username" />
+      </label>
+      <label>
+        {t(locale, 'auth.password')}
+        <input type="password" name="password" required autocomplete="one-time-code" />
+      </label>
+      <button type="submit" class="auth-primary">{t(locale, 'auth.signin.submit')}</button>
+    </form>
   </div>
 </div>
 
 <script>
   import { restore, signInWithPassword, sendMagicLink, signInWithProvider, AuthError, isConfigured } from '../lib/auth';
+  import { login as pbLogin } from '../lib/pb';
 
   const gate = document.getElementById('brotea-auth-gate') as HTMLElement;
   const form = document.getElementById('brotea-auth-form') as HTMLFormElement;
@@ -70,7 +87,13 @@ const { locale } = Astro.props;
    *  to reset a password that was fine. */
   function explain(err: unknown): string {
     if (err instanceof AuthError && err.status === 403) return gate.dataset.msgDenied ?? '';
-    if (err instanceof AuthError && err.status === 503) return gate.dataset.msgOffline ?? '';
+    if (err instanceof AuthError && err.status === 503) {
+      // The identity plane is unreachable. This is the ONLY moment the
+      // emergency door is shown: a permanent second entrance would be a
+      // permanent second attack surface.
+      breakglass.hidden = false;
+      return gate.dataset.msgOffline ?? '';
+    }
     return gate.dataset.msgError ?? '';
   }
 
@@ -85,6 +108,23 @@ const { locale } = Astro.props;
       msg.textContent = explain(err);
     } finally {
       btn.disabled = false;
+    }
+  });
+
+  const breakglass = document.getElementById('brotea-auth-breakglass') as HTMLFormElement;
+
+  // Straight to PocketBase, without touching Supabase — which is the whole
+  // point. `authRule = "role != ''"` still applies, so an emergency password
+  // opens a door that a role already opened; it is not a way to become one.
+  breakglass.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    msg.textContent = '';
+    const data = new FormData(breakglass);
+    try {
+      const record = await pbLogin(String(data.get('email')), String(data.get('password'))) as { role?: string };
+      open({ role: record.role ?? 'member' });
+    } catch {
+      msg.textContent = gate.dataset.msgError ?? '';
     }
   });
 
