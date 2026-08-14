@@ -12,6 +12,7 @@ const { locale } = Astro.props;
 <nav>
   <a href={localePath(locale, '/')}>{t(locale, 'nav.home')}</a>
   <!-- brotea:nav -->
+  <a href={localePath(locale, '/panel')}>{t(locale, 'panel.title')}</a>
   <LanguageSwitcher locale={locale} />
 </nav>
 
