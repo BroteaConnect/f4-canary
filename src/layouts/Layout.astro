@@ -5,7 +5,7 @@ import Nav from '../components/Nav.astro';
 import { DEFAULT_LOCALE, alternates, dirOf, localePath, stripLocale } from '../lib/i18n';
 
 interface Props { title?: string; locale?: string }
-const { title = '__PROJECT_NAME__', locale = DEFAULT_LOCALE } = Astro.props;
+const { title = 'F4 Canary', locale = DEFAULT_LOCALE } = Astro.props;
 // hreflang wants absolute URLs; `site` in astro.config makes these absolute.
 const path = stripLocale(Astro.url.pathname);
 const abs = (href: string) => (Astro.site ? new URL(href, Astro.site).href : href);

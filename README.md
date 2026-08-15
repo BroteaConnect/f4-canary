@@ -1,4 +1,4 @@
-# __PROJECT_NAME__
+# F4 Canary
 
 Astro + TypeScript site generated from Brotea's `astro` stack. Content-first
 and SEO-friendly; interactive features render as React islands.

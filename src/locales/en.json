@@ -40,7 +40,7 @@
   "auth.title": "Restricted area",
   "auth.working": "Checking…",
   "home.generated": "Generated from Brotea's {stack} stack. Features added with the template factory appear in the nav above, rendered as React islands.",
-  "home.tagline": "__PROJECT_DESCRIPTION__",
+  "home.tagline": "F4 Canary",
   "nav.home": "Home",
   "nav.language": "Language",
   "panel.add": "Add",

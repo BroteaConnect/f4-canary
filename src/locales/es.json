@@ -40,7 +40,7 @@
   "auth.title": "Acceso restringido",
   "auth.working": "Comprobando…",
   "home.generated": "Generado con el stack {stack} de Brotea. Las features que añade la fábrica de plantillas aparecen en el menú de arriba, renderizadas como islas de React.",
-  "home.tagline": "__PROJECT_DESCRIPTION__",
+  "home.tagline": "F4 Canary",
   "nav.home": "Inicio",
   "nav.language": "Idioma",
   "panel.add": "Añadir",

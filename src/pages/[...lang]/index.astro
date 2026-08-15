@@ -8,8 +8,8 @@ export const getStaticPaths = localePaths;
 const { locale } = Astro.props;
 ---
 
-<Layout title="__PROJECT_NAME__" locale={locale}>
-  <h1>__PROJECT_NAME__</h1>
+<Layout title="F4 Canary" locale={locale}>
+  <h1>F4 Canary</h1>
   <p>{t(locale, 'home.tagline')}</p>
   <p>{t(locale, 'home.generated', { stack: 'astro' })}</p>
 </Layout>
